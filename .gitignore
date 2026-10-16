@@ -53,3 +53,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# Local agent settings
+/AGENTS.md
