@@ -7,6 +7,9 @@ spring:
         follower: follower_channel
         achievement: achievement_channel
 
+  application:
+    name: notification-service
+
   mail:
     username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
@@ -34,8 +37,7 @@ logging:
   level:
     root: info
 
-#Можно зарегистрировать аккаунт без привязки карты. Будет 2 евро на отправку тестовых SMS
-vonage: #https://dashboard.nexmo.com/getting-started/sms
+vonage:
   api:
     key: whatever
     secret: whatever
@@ -50,3 +52,17 @@ user-service:
 notifications:
   channels:
     post-created: post.created
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        notifications.email.send: true
