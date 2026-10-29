@@ -27,12 +27,15 @@ public class EmailService implements NotificationService {
         mail.setText(message);
 
         Timer.Sample sample = emailNotificationMetrics.start();
+        emailNotificationMetrics.sendingStarted();
 
         try {
             javaMailSender.send(mail);
         } catch (MailException exception) {
             emailNotificationMetrics.recordError(sample);
             throw exception;
+        } finally {
+            emailNotificationMetrics.sendingFinished();
         }
 
         emailNotificationMetrics.recordSuccess(sample);
