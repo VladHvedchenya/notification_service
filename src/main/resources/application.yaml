@@ -1,4 +1,16 @@
 spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notification-service-post-created-v1
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+      auto-offset-reset: latest
+      max-poll-records: 1
+    listener:
+      ack-mode: record
+      concurrency: ${NOTIFICATIONS_KAFKA_CONCURRENCY:3}
   data:
     redis:
       port: 6379
@@ -50,8 +62,11 @@ user-service:
     port: 8080
 
 notifications:
+  transport: ${NOTIFICATIONS_TRANSPORT:redis}
   channels:
     post-created: post.created
+  kafka:
+    topic: post_topic
 
 management:
   endpoints:

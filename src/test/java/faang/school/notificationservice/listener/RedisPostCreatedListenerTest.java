@@ -6,6 +6,7 @@ import faang.school.notificationservice.dto.UserDto;
 import faang.school.notificationservice.dto.event.PostCreatedEvent;
 import faang.school.notificationservice.messaging.MessageBuilder;
 import faang.school.notificationservice.service.NotificationService;
+import faang.school.notificationservice.service.PostCreatedEventHandler;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
@@ -20,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.connection.DefaultMessage;
 import org.springframework.data.redis.connection.Message;
+import org.springframework.mail.MailSendException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -30,11 +32,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 
 @ExtendWith(MockitoExtension.class)
-class PostCreatedListenerTest {
+class RedisPostCreatedListenerTest {
     private static ValidatorFactory validatorFactory;
 
     @Mock
@@ -49,7 +52,7 @@ class PostCreatedListenerTest {
     @Mock
     private NotificationService smsService;
 
-    private PostCreatedListener listener;
+    private RedisPostCreatedListener listener;
 
     @BeforeAll
     static void createValidatorFactory() {
@@ -63,12 +66,13 @@ class PostCreatedListenerTest {
 
     @BeforeEach
     void setUp() {
-        listener = new PostCreatedListener(
+        PostCreatedEventHandler handler = new PostCreatedEventHandler(
                 new ObjectMapper(),
                 validatorFactory.getValidator(),
                 userServiceClient,
                 messageBuilder,
                 List.of(emailService, smsService));
+        listener = new RedisPostCreatedListener(handler);
     }
 
     @Test
@@ -136,6 +140,19 @@ class PostCreatedListenerTest {
 
         assertThatThrownBy(() -> listener.onMessage(validMessage(), null)).isSameAs(failure);
         verifyNoInteractions(messageBuilder, emailService, smsService);
+    }
+
+    @Test
+    void shouldPropagateEmailFailure() {
+        UserDto author = user(UserDto.PreferredContact.EMAIL);
+        MailSendException failure = new MailSendException("SMTP unavailable");
+        when(userServiceClient.getUser(1L)).thenReturn(author);
+        when(messageBuilder.buildMessage(new PostCreatedEvent(12345L, 1L, null), Locale.forLanguageTag("ru")))
+                .thenReturn("Post created");
+        when(emailService.getPreferredContact()).thenReturn(UserDto.PreferredContact.EMAIL);
+        doThrow(failure).when(emailService).send(author, "Post created");
+
+        assertThatThrownBy(() -> listener.onMessage(validMessage(), null)).isSameAs(failure);
     }
 
     private void prepareUser(UserDto.PreferredContact preference) {
